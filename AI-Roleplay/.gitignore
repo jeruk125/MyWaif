@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+audio_cache/*
+!audio_cache/.keep
+conversations/*
+!conversations/.keep
+characters/*/memory/*.json

@@ -1,0 +1,27 @@
+{
+  "voicevox_url": "http://localhost:50021",
+  "active_character": "rin_tohsaka",
+  "memory_extraction_interval_turns": 5,
+  "memory_extraction_mode": "background",
+  "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
+  "providers": {
+    "chat": {
+      "type": "local",
+      "base_url": "http://localhost:1234/v1",
+      "model_name": "local-model",
+      "api_key": "not-needed"
+    },
+    "translation": {
+      "type": "local",
+      "base_url": "http://localhost:1234/v1",
+      "model_name": "local-model",
+      "api_key": "not-needed"
+    },
+    "memory": {
+      "type": "local",
+      "base_url": "http://localhost:1234/v1",
+      "model_name": "local-model",
+      "api_key": "not-needed"
+    }
+  }
+}
