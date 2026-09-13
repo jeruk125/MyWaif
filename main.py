@@ -159,6 +159,14 @@ def toggle_debug():
     save_config()
     return jsonify({"status": "success", "debug_mode": config['debug_mode']})
 
+@app.route('/api/toggle_voice', methods=['POST'])
+def toggle_voice():
+    global config
+    data = request.json
+    config['enable_voice'] = data.get('enable_voice', True)
+    save_config()
+    return jsonify({"status": "success", "enable_voice": config['enable_voice']})
+
 @app.route('/api/sessions', methods=['GET'])
 def get_sessions():
     conversations_dir = "conversations"
@@ -247,45 +255,52 @@ def handle_message(data):
         emit('bot_response', {'text': response_text, 'audio_url': None})
 
         # 4. Process VoiceVox pipeline
-        emit('status', {'message': 'Memproses suara...'})
+        enable_voice = config.get('enable_voice', True)
 
-        dialogue_text = llm_client.extract_dialogue(response_text)
+        if enable_voice:
+            emit('status', {'message': 'Memproses suara...'})
 
-        if dialogue_text:
-            # Get speaker ID from character data, default to 2
-            # Here we just parse it simply, assuming it's in character.txt or use default
-            speaker_id = 2
-            import re
-            m = re.search(r'Speaker ID VoiceVox:\s*(\d+)', character_data['persona'])
-            if m:
-                speaker_id = int(m.group(1))
+            dialogue_text = llm_client.extract_dialogue(response_text)
 
-            start_time_translate = time.time()
-            if is_debug: debug_info['translate_provider'] = config.get('providers', {}).get('translation', {}).get('type', 'unknown')
+            if dialogue_text:
+                # Get speaker ID from character data, default to 2
+                # Here we just parse it simply, assuming it's in character.txt or use default
+                speaker_id = 2
+                import re
+                m = re.search(r'Speaker ID VoiceVox:\s*(\d+)', character_data['persona'])
+                if m:
+                    speaker_id = int(m.group(1))
 
-            jp_text = llm_client.translate_to_japanese(dialogue_text)
+                start_time_translate = time.time()
+                if is_debug: debug_info['translate_provider'] = config.get('providers', {}).get('translation', {}).get('type', 'unknown')
 
-            translate_latency = time.time() - start_time_translate
-            if is_debug:
-                debug_info['translation'] = jp_text
-                debug_info['translate_latency'] = round(translate_latency, 2)
-                debug_info['translate_status'] = "Success" if jp_text else "Failed"
+                jp_text = llm_client.translate_to_japanese(dialogue_text)
 
-            if jp_text:
-                start_time_voice = time.time()
-                audio_filename = voicevox_client.synthesize(jp_text, speaker_id=speaker_id)
-                voice_latency = time.time() - start_time_voice
-
+                translate_latency = time.time() - start_time_translate
                 if is_debug:
-                    debug_info['voice_latency'] = round(voice_latency, 2)
-                    debug_info['voice_status'] = "Success" if audio_filename else "Failed"
+                    debug_info['translation'] = jp_text
+                    debug_info['translate_latency'] = round(translate_latency, 2)
+                    debug_info['translate_status'] = "Success" if jp_text else "Failed"
 
-                if audio_filename:
-                    # Update the UI with the audio URL for the last message
-                    emit('audio_ready', {'audio_url': f'/audio/{audio_filename}'})
+                if jp_text:
+                    start_time_voice = time.time()
+                    audio_filename = voicevox_client.synthesize(jp_text, speaker_id=speaker_id)
+                    voice_latency = time.time() - start_time_voice
 
-        # Cleanup old cache
-        voicevox_client.cleanup_cache()
+                    if is_debug:
+                        debug_info['voice_latency'] = round(voice_latency, 2)
+                        debug_info['voice_status'] = "Success" if audio_filename else "Failed"
+
+                    if audio_filename:
+                        # Update the UI with the audio URL for the last message
+                        emit('audio_ready', {'audio_url': f'/audio/{audio_filename}'})
+
+            # Cleanup old cache
+            voicevox_client.cleanup_cache()
+        else:
+            if is_debug:
+                debug_info['translate_status'] = "Skipped"
+                debug_info['voice_status'] = "Skipped"
 
         # 5. Trigger Memory Extraction if needed
         interval = config.get('memory_extraction_interval_turns', 5)

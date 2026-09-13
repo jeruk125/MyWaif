@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusIndicator = document.getElementById('status-indicator');
     const audioPlayer = document.getElementById('audio-player');
 
+    const voiceToggleBtn = document.getElementById('voice-toggle-btn');
     const debugToggleBtn = document.getElementById('debug-toggle-btn');
     const debugSidebar = document.getElementById('debug-sidebar');
     const closeDebugBtn = document.getElementById('close-debug-btn');
@@ -83,7 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const createStatusItem = (title, status, latency, provider) => {
             if (!status) return '';
-            const statusClass = status.includes('Success') || status.includes('Completed') ? 'status-success' : 'status-failed';
+            let statusClass = 'status-failed';
+            if (status.includes('Success') || status.includes('Completed')) statusClass = 'status-success';
+            if (status.includes('Skipped')) statusClass = 'status-skipped';
             return `
                 <div class="debug-item">
                     <h4>${title}</h4>
@@ -193,6 +196,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Settings Management ---
+    function updateVoiceToggleUI(isOn) {
+        if (isOn) {
+            voiceToggleBtn.classList.add('voice-on');
+            voiceToggleBtn.innerText = '🔊 Voice: On';
+        } else {
+            voiceToggleBtn.classList.remove('voice-on');
+            voiceToggleBtn.innerText = '🔇 Voice: Off';
+        }
+    }
+
     function updateDebugToggleUI(isOn) {
         const container = document.querySelector('.container');
         if (isOn) {
@@ -215,6 +228,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch('/api/config')
             .then(res => res.json())
             .then(config => {
+                const isVoiceOn = config.enable_voice !== undefined ? config.enable_voice : true;
+                updateVoiceToggleUI(isVoiceOn);
                 updateDebugToggleUI(config.debug_mode);
                 document.getElementById('set-character').value = config.active_character;
                 document.getElementById('set-voicevox').value = config.voicevox_url;
@@ -274,6 +289,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusIndicator.innerText = "Started New Session";
             });
     }
+
+    voiceToggleBtn.onclick = () => {
+        const isCurrentlyOn = voiceToggleBtn.classList.contains('voice-on');
+        const newState = !isCurrentlyOn;
+
+        fetch('/api/toggle_voice', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({enable_voice: newState})
+        }).then(res => res.json())
+          .then(data => {
+              if (data.status === 'success') {
+                  updateVoiceToggleUI(data.enable_voice);
+              }
+          });
+    };
 
     debugToggleBtn.onclick = () => {
         const isCurrentlyOn = debugToggleBtn.classList.contains('debug-on');
