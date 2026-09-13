@@ -97,10 +97,46 @@ def build_system_prompt(user_input):
     prompt += "- Jawab selalu dalam Bahasa Indonesia.\n"
     prompt += "- Pisahkan narasi/aksi menggunakan tanda bintang (*) atau kurung ().\n"
     prompt += "- Pastikan dialog yang diucapkan langsung diapit tanda kutip ganda (\").\n"
-    prompt += "- Sisipkan [MOOD: <mood_anda>] di bagian paling akhir respons untuk mengindikasikan mood Anda saat ini (contoh: [MOOD: senang], [MOOD: marah]).\n"
+    prompt += "- Sisipkan [MOOD: <mood_anda>] di bagian paling akhir respons untuk mengindikasikan mood Anda secara umum (contoh: [MOOD: senang], [MOOD: marah]).\n"
+    prompt += "- PENTING: Untuk suara, awali respons Anda dengan prefix tag emosi: [emotion:<emosi>|intensity:<0.0-1.0>]\n"
+    prompt += "- Pilihan <emosi> hanya boleh salah satu dari: netral, senang, sedih, marah, tsundere, takut, bisik.\n"
+    prompt += "- Contoh output yang benar: [emotion:senang|intensity:0.8] \"Halo!\" *aku tersenyum* [MOOD: ceria]\n"
     prompt += "- Jangan keluar dari karakter.\n"
 
     return prompt, retrieved_memories_debug
+
+def extract_emotion_and_mood_from_response(response_text):
+    import re
+    # Extract TTS emotion
+    emotion = "netral"
+    intensity = 1.0
+
+    emotion_match = re.search(r'\[emotion:\s*(.*?)\s*\|\s*intensity:\s*([0-9.]+)\]', response_text, re.IGNORECASE)
+    if emotion_match:
+        extracted_emotion = emotion_match.group(1).strip().lower()
+        valid_emotions = ["netral", "senang", "sedih", "marah", "tsundere", "takut", "bisik"]
+        if extracted_emotion in valid_emotions:
+            emotion = extracted_emotion
+
+        try:
+            intensity = float(emotion_match.group(2))
+            if intensity < 0.0 or intensity > 1.0:
+                intensity = 1.0 # fallback if out of bounds
+        except ValueError:
+            intensity = 1.0 # fallback if not a float
+
+    # Clean text from emotion tag
+    clean_text = re.sub(r'\[emotion:\s*.*?\s*\|\s*intensity:\s*[0-9.]+\]', '', response_text, flags=re.IGNORECASE).strip()
+
+    # Extract MOOD
+    mood = None
+    mood_match = re.search(r'\[MOOD:\s*(.*?)\]', clean_text, re.IGNORECASE)
+    if mood_match:
+        mood = mood_match.group(1).strip()
+        # Clean text from mood tag
+        clean_text = re.sub(r'\[MOOD:\s*.*?\]', '', clean_text, flags=re.IGNORECASE).strip()
+
+    return emotion, intensity, mood, clean_text
 
 def extract_mood_from_response(response_text):
     import re
@@ -243,7 +279,7 @@ def handle_message(data):
             if is_debug: emit('debug_info', debug_info)
             return
 
-        mood, response_text = extract_mood_from_response(raw_response_text)
+        emotion, intensity, mood, response_text = extract_emotion_and_mood_from_response(raw_response_text)
 
         if mood:
             memory_manager.update_temporary_state({"mood": mood})
@@ -284,7 +320,8 @@ def handle_message(data):
 
                 if jp_text:
                     start_time_voice = time.time()
-                    audio_filename = voicevox_client.synthesize(jp_text, speaker_id=speaker_id)
+                    voicevox_styles = character_data.get('voicevox_styles', {})
+                    audio_filename = voicevox_client.synthesize(jp_text, speaker_id=speaker_id, emotion=emotion, intensity=intensity, style_mapping=voicevox_styles)
                     voice_latency = time.time() - start_time_voice
 
                     if is_debug:
