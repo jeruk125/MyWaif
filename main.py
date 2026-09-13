@@ -74,8 +74,7 @@ def save_session():
 
 def build_system_prompt(user_input):
     # 1. Base Persona & Lore
-    prompt = f"Anda adalah {character_data['id']}.\n\n"
-    prompt += f"Kepribadian dan Gaya Bicara:\n{character_data['persona']}\n\n"
+    prompt = f"{character_data['persona']}"
     prompt += f"Latar Belakang / Lore:\n{character_data['lore']}\n\n"
 
     # 2. Mood / State
