@@ -27,6 +27,11 @@ body {
     height: 100%;
     background-color: var(--chat-bg);
     box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    transition: max-width 0.3s;
+}
+
+.container.debug-open {
+    max-width: 1200px;
 }
 
 header {
@@ -93,6 +98,7 @@ header h1 {
     flex-direction: column;
     overflow: hidden;
     transition: width 0.3s;
+    flex-shrink: 0;
 }
 
 .debug-sidebar.open {
@@ -147,6 +153,11 @@ header h1 {
     color: #4CAF50;
     border-bottom: 1px solid #444;
     padding-bottom: 3px;
+}
+
+.debug-item pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 .debug-item .status-success {

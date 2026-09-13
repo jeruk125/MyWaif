@@ -194,10 +194,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Settings Management ---
     function updateDebugToggleUI(isOn) {
+        const container = document.querySelector('.container');
         if (isOn) {
             debugToggleBtn.classList.add('debug-on');
             debugToggleBtn.innerText = '🐛 Debug: On';
             debugSidebar.classList.add('open');
+            if (container) container.classList.add('debug-open');
             if (debugContent.innerHTML.trim() === '') {
                 debugContent.innerHTML = '<p class="debug-empty">Waiting for interaction...</p>';
             }
@@ -205,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
             debugToggleBtn.classList.remove('debug-on');
             debugToggleBtn.innerText = '🐛 Debug: Off';
             debugSidebar.classList.remove('open');
+            if (container) container.classList.remove('debug-open');
         }
     }
 
