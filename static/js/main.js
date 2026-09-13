@@ -2,11 +2,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const socket = io();
 
     // UI Elements
+
+    // Call loadSettings on load to get the debug state initially
+    loadSettings();
     const chatContainer = document.getElementById('chat-container');
     const messageInput = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
     const statusIndicator = document.getElementById('status-indicator');
     const audioPlayer = document.getElementById('audio-player');
+
+    const debugToggleBtn = document.getElementById('debug-toggle-btn');
+    const debugSidebar = document.getElementById('debug-sidebar');
+    const closeDebugBtn = document.getElementById('close-debug-btn');
+    const debugContent = document.getElementById('debug-content');
 
     const settingsBtn = document.getElementById('settings-btn');
     const sessionsBtn = document.getElementById('sessions-btn');
@@ -55,6 +63,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('error', (data) => {
         appendMessage('bot', "❌ Error: " + data.message);
+    });
+
+    socket.on('debug_info', (data) => {
+        if (!debugSidebar.classList.contains('open')) return;
+
+        debugContent.innerHTML = ''; // Clear previous
+
+        const createDebugItem = (title, content, isObject = false) => {
+            if (!content && content !== 0) return '';
+            let val = isObject ? JSON.stringify(content, null, 2) : content;
+            return `
+                <div class="debug-item">
+                    <h4>${title}</h4>
+                    <pre>${val}</pre>
+                </div>
+            `;
+        };
+
+        const createStatusItem = (title, status, latency, provider) => {
+            if (!status) return '';
+            const statusClass = status.includes('Success') || status.includes('Completed') ? 'status-success' : 'status-failed';
+            return `
+                <div class="debug-item">
+                    <h4>${title}</h4>
+                    <div>Status: <span class="${statusClass}">${status}</span></div>
+                    ${provider ? `<div>Provider: ${provider}</div>` : ''}
+                    ${latency ? `<div>Latency: ${latency}s</div>` : ''}
+                </div>
+            `;
+        };
+
+        let html = '';
+
+        if (data.total_latency) {
+            html += `<div class="debug-item"><h4>Total Pipeline Time</h4><div>${data.total_latency}s</div></div>`;
+        }
+
+        if (data.error) {
+            html += createDebugItem('Error', data.error);
+        }
+
+        html += createStatusItem('Chat Generation', data.chat_status, data.chat_latency, data.chat_provider);
+        html += createStatusItem('Translation', data.translate_status, data.translate_latency, data.translate_provider);
+        html += createStatusItem('VoiceVox', data.voice_status, data.voice_latency, null);
+        html += createStatusItem('Memory Extraction', data.memory_extraction_status, data.memory_extraction_latency, data.memory_provider);
+
+        html += createDebugItem('Retrieved Memories', data.retrieved_memories, true);
+        html += createDebugItem('System Prompt', data.system_prompt);
+        html += createDebugItem('Raw Response', data.raw_response);
+
+        if (html === '') {
+            html = '<p class="debug-empty">No debug data received yet.</p>';
+        }
+
+        debugContent.innerHTML = html;
     });
 
     // --- Chat Functions ---
@@ -130,10 +193,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Settings Management ---
+    function updateDebugToggleUI(isOn) {
+        if (isOn) {
+            debugToggleBtn.classList.add('debug-on');
+            debugToggleBtn.innerText = '🐛 Debug: On';
+            debugSidebar.classList.add('open');
+            if (debugContent.innerHTML.trim() === '') {
+                debugContent.innerHTML = '<p class="debug-empty">Waiting for interaction...</p>';
+            }
+        } else {
+            debugToggleBtn.classList.remove('debug-on');
+            debugToggleBtn.innerText = '🐛 Debug: Off';
+            debugSidebar.classList.remove('open');
+        }
+    }
+
     function loadSettings() {
         fetch('/api/config')
             .then(res => res.json())
             .then(config => {
+                updateDebugToggleUI(config.debug_mode);
                 document.getElementById('set-character').value = config.active_character;
                 document.getElementById('set-voicevox').value = config.voicevox_url;
                 document.getElementById('set-mem-mode').value = config.memory_extraction_mode;
@@ -192,6 +271,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusIndicator.innerText = "Started New Session";
             });
     }
+
+    debugToggleBtn.onclick = () => {
+        const isCurrentlyOn = debugToggleBtn.classList.contains('debug-on');
+        const newState = !isCurrentlyOn;
+
+        fetch('/api/toggle_debug', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({debug_mode: newState})
+        }).then(res => res.json())
+          .then(data => {
+              if (data.status === 'success') {
+                  updateDebugToggleUI(data.debug_mode);
+              }
+          });
+    };
+
+    closeDebugBtn.onclick = () => {
+        fetch('/api/toggle_debug', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({debug_mode: false})
+        }).then(res => res.json())
+          .then(data => {
+              if (data.status === 'success') {
+                  updateDebugToggleUI(false);
+              }
+          });
+    };
 
     settingsBtn.onclick = () => {
         loadSettings();

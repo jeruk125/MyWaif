@@ -85,11 +85,13 @@ def build_system_prompt(user_input):
 
     # 3. Relevant Memories
     memories = memory_manager.get_relevant_memories(user_input, top_k=5)
+    retrieved_memories_debug = []
     if memories:
         prompt += "Memori/Fakta yang relevan:\n"
         for m in memories:
             text = m['content'].get('text', str(m['content']))
             prompt += f"- [{m['category']}] {text}\n"
+            retrieved_memories_debug.append(f"[{m['category']}] {text}")
         prompt += "\n"
 
     prompt += "Instruksi Khusus:\n"
@@ -99,7 +101,7 @@ def build_system_prompt(user_input):
     prompt += "- Sisipkan [MOOD: <mood_anda>] di bagian paling akhir respons untuk mengindikasikan mood Anda saat ini (contoh: [MOOD: senang], [MOOD: marah]).\n"
     prompt += "- Jangan keluar dari karakter.\n"
 
-    return prompt
+    return prompt, retrieved_memories_debug
 
 def extract_mood_from_response(response_text):
     import re
@@ -150,6 +152,14 @@ def handle_config():
         return jsonify({"status": "success"})
     return jsonify(config)
 
+@app.route('/api/toggle_debug', methods=['POST'])
+def toggle_debug():
+    global config
+    data = request.json
+    config['debug_mode'] = data.get('debug_mode', False)
+    save_config()
+    return jsonify({"status": "success", "debug_mode": config['debug_mode']})
+
 @app.route('/api/sessions', methods=['GET'])
 def get_sessions():
     conversations_dir = "conversations"
@@ -188,6 +198,10 @@ def handle_message(data):
     if not user_text:
         return
 
+    debug_info = {}
+    is_debug = config.get('debug_mode', False)
+    start_time_total = time.time()
+
     # 1. Update history
     conversation_history.append({"role": "user", "content": user_text})
     turn_counter += 1
@@ -200,11 +214,26 @@ def handle_message(data):
 
     try:
         # 2. Generate Response
-        system_prompt = build_system_prompt(user_text)
+        start_time_chat = time.time()
+        system_prompt, retrieved_memories = build_system_prompt(user_text)
+
+        if is_debug:
+            debug_info['system_prompt'] = system_prompt
+            debug_info['retrieved_memories'] = retrieved_memories
+            debug_info['context_messages'] = context_msgs
+            debug_info['chat_provider'] = config.get('providers', {}).get('chat', {}).get('type', 'unknown')
+
         raw_response_text = llm_client.generate_chat(context_msgs, system_prompt)
+        chat_latency = time.time() - start_time_chat
+
+        if is_debug:
+            debug_info['raw_response'] = raw_response_text
+            debug_info['chat_latency'] = round(chat_latency, 2)
+            debug_info['chat_status'] = "Success" if raw_response_text else "Failed"
 
         if not raw_response_text:
             emit('error', {'message': 'Gagal mendapatkan respons dari LLM.'})
+            if is_debug: emit('debug_info', debug_info)
             return
 
         mood, response_text = extract_mood_from_response(raw_response_text)
@@ -232,9 +261,26 @@ def handle_message(data):
             if m:
                 speaker_id = int(m.group(1))
 
+            start_time_translate = time.time()
+            if is_debug: debug_info['translate_provider'] = config.get('providers', {}).get('translation', {}).get('type', 'unknown')
+
             jp_text = llm_client.translate_to_japanese(dialogue_text)
+
+            translate_latency = time.time() - start_time_translate
+            if is_debug:
+                debug_info['translation'] = jp_text
+                debug_info['translate_latency'] = round(translate_latency, 2)
+                debug_info['translate_status'] = "Success" if jp_text else "Failed"
+
             if jp_text:
+                start_time_voice = time.time()
                 audio_filename = voicevox_client.synthesize(jp_text, speaker_id=speaker_id)
+                voice_latency = time.time() - start_time_voice
+
+                if is_debug:
+                    debug_info['voice_latency'] = round(voice_latency, 2)
+                    debug_info['voice_status'] = "Success" if audio_filename else "Failed"
+
                 if audio_filename:
                     # Update the UI with the audio URL for the last message
                     emit('audio_ready', {'audio_url': f'/audio/{audio_filename}'})
@@ -248,18 +294,34 @@ def handle_message(data):
             emit('status', {'message': 'Menyimpan memori...'})
             recent_log = conversation_history[-(interval * 2):] # User + Assistant pairs
 
+            if is_debug: debug_info['memory_provider'] = config.get('providers', {}).get('memory', {}).get('type', 'unknown')
+
             mode = config.get('memory_extraction_mode', 'background')
             if mode == 'background':
+                # Can't easily track time/status in background thread for this request's debug_info
                 threading.Thread(target=perform_memory_extraction, args=(recent_log,)).start()
+                if is_debug: debug_info['memory_extraction_status'] = "Started (Background)"
             else:
+                start_time_mem = time.time()
                 perform_memory_extraction(recent_log)
+                mem_latency = time.time() - start_time_mem
+                if is_debug:
+                    debug_info['memory_extraction_latency'] = round(mem_latency, 2)
+                    debug_info['memory_extraction_status'] = "Completed (Sync)"
 
         emit('status', {'message': 'Siap'})
+
+        if is_debug:
+            debug_info['total_latency'] = round(time.time() - start_time_total, 2)
+            emit('debug_info', debug_info)
 
     except Exception as e:
         print(f"Error handling message: {e}")
         emit('error', {'message': f"Terjadi kesalahan: {str(e)}"})
         emit('status', {'message': 'Error'})
+        if is_debug:
+            debug_info['error'] = str(e)
+            emit('debug_info', debug_info)
 
 if __name__ == '__main__':
     initialize_system()

@@ -4,6 +4,7 @@
     "memory_extraction_interval_turns": 5,
     "memory_extraction_mode": "background",
     "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
+    "debug_mode": true,
     "providers": {
         "chat": {
             "type": "local",

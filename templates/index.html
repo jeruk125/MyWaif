@@ -16,14 +16,28 @@
                 <span id="status-indicator">Connecting...</span>
             </div>
             <div>
+                <button id="debug-toggle-btn">🐛 Debug: Off</button>
                 <button id="sessions-btn">📁 Sessions</button>
                 <button id="settings-btn">⚙️ Settings</button>
             </div>
         </header>
 
-        <!-- Chat Area -->
-        <div id="chat-container">
-            <!-- Messages will appear here -->
+        <div class="main-content">
+            <!-- Chat Area -->
+            <div id="chat-container">
+                <!-- Messages will appear here -->
+            </div>
+
+            <!-- Debug Sidebar -->
+            <div id="debug-sidebar" class="debug-sidebar">
+                <div class="debug-header">
+                    <h3>🛠️ Debug Info</h3>
+                    <button id="close-debug-btn">&times;</button>
+                </div>
+                <div id="debug-content" class="debug-content">
+                    <p class="debug-empty">Waiting for interaction...</p>
+                </div>
+            </div>
         </div>
 
         <!-- Input Area -->
