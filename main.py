@@ -178,6 +178,40 @@ def handle_config():
         return jsonify({"status": "success"})
     return jsonify(config)
 
+@app.route('/api/test_tts', methods=['POST'])
+def test_tts():
+    data = request.json
+    tts_config = data.get('tts_config')
+    active_character = data.get('active_character')
+
+    if not tts_config or not active_character:
+        return jsonify({"status": "error", "message": "Missing config or character data"}), 400
+
+    try:
+        # Load character to get speaker_id and voice_openai
+        char_loader = CharacterLoader()
+        char_data = char_loader.load_character(active_character)
+
+        # Instantiate temporary client
+        temp_config = {"providers": {"tts": tts_config}}
+        temp_tts_client = get_tts_client(temp_config)
+
+        # Synthesize test word
+        test_text = "テスト" # "Tesuto" in Japanese
+        speaker_id = char_data.get('speaker_id', 2)
+        voice = char_data.get('voice_openai')
+
+        audio_filename = temp_tts_client.synthesize(test_text, speaker_id=speaker_id, voice=voice)
+
+        if audio_filename:
+            return jsonify({"status": "success", "audio_url": f"/audio/{audio_filename}"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to synthesize audio. Check credentials/URL."}), 500
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/api/toggle_debug', methods=['POST'])
 def toggle_debug():
     global config

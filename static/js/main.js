@@ -227,6 +227,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const ttsTypeSelect = document.getElementById('tts-type');
     const ttsVoicevoxGroup = document.getElementById('tts-voicevox-group');
     const ttsOpenaiGroup = document.getElementById('tts-openai-group');
+    const testTtsBtn = document.getElementById('test-tts-btn');
+    const testTtsStatus = document.getElementById('test-tts-status');
 
     function updateTTSProviderUI() {
         if (!ttsTypeSelect) return;
@@ -256,13 +258,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Providers
                 if(config.providers) {
+                    const prefixMap = {
+                        'chat': 'chat',
+                        'translation': 'trans',
+                        'memory': 'mem'
+                    };
                     ['chat', 'translation', 'memory'].forEach(type => {
                         const p = config.providers[type];
+                        const prefix = prefixMap[type];
                         if(p) {
-                            document.getElementById(`${type.substring(0,4)}-type`).value = p.type;
-                            document.getElementById(`${type.substring(0,4)}-url`).value = p.base_url || '';
-                            document.getElementById(`${type.substring(0,4)}-model`).value = p.model_name || '';
-                            document.getElementById(`${type.substring(0,4)}-key`).value = p.api_key || '';
+                            if (document.getElementById(`${prefix}-type`)) document.getElementById(`${prefix}-type`).value = p.type || 'local';
+                            if (document.getElementById(`${prefix}-url`)) document.getElementById(`${prefix}-url`).value = p.base_url || '';
+                            if (document.getElementById(`${prefix}-model`)) document.getElementById(`${prefix}-model`).value = p.model_name || '';
+                            if (document.getElementById(`${prefix}-key`)) document.getElementById(`${prefix}-key`).value = p.api_key || '';
                         }
                     });
 
@@ -386,7 +394,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    if (testTtsBtn) {
+        testTtsBtn.onclick = () => {
+            const originalBtnText = testTtsBtn.innerText;
+            testTtsBtn.innerText = "Testing...";
+            testTtsBtn.disabled = true;
+            testTtsStatus.innerText = "";
+            testTtsStatus.style.color = "white";
+
+            const payload = {
+                active_character: document.getElementById('set-character').value,
+                tts_config: {
+                    type: document.getElementById('tts-type').value,
+                    voicevox_url: document.getElementById('tts-voicevox-url').value,
+                    base_url: document.getElementById('tts-url').value,
+                    model_name: document.getElementById('tts-model').value,
+                    api_key: document.getElementById('tts-key').value,
+                    voice: document.getElementById('tts-voice').value
+                }
+            };
+
+            fetch('/api/test_tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(res => res.json())
+              .then(data => {
+                  testTtsBtn.innerText = originalBtnText;
+                  testTtsBtn.disabled = false;
+                  if (data.status === 'success') {
+                      testTtsStatus.innerText = "Sukses";
+                      testTtsStatus.style.color = "#4CAF50"; // Green
+                      if (data.audio_url) {
+                          playAudio(data.audio_url);
+                      }
+                  } else {
+                      testTtsStatus.innerText = "Error: " + data.message;
+                      testTtsStatus.style.color = "#F44336"; // Red
+                  }
+              }).catch(err => {
+                  testTtsBtn.innerText = originalBtnText;
+                  testTtsBtn.disabled = false;
+                  testTtsStatus.innerText = "Error: Network issue";
+                  testTtsStatus.style.color = "#F44336"; // Red
+                  console.error(err);
+              });
+        };
+    }
+
     saveSettingsBtn.onclick = () => {
+        const originalText = saveSettingsBtn.innerText;
+        saveSettingsBtn.innerText = "Saving... (This may take a while)";
+        saveSettingsBtn.disabled = true;
+
         const newConfig = {
             active_character: document.getElementById('set-character').value,
             memory_extraction_mode: document.getElementById('set-mem-mode').value,
@@ -433,6 +493,8 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             body: JSON.stringify(newConfig)
         }).then(() => {
+            saveSettingsBtn.innerText = originalText;
+            saveSettingsBtn.disabled = false;
             settingsModal.style.display = "none";
             // Clear chat on settings change to restart fresh
             chatContainer.innerHTML = '';
@@ -440,6 +502,11 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                  window.location.reload();
             }, 1000);
+        }).catch((err) => {
+            saveSettingsBtn.innerText = originalText;
+            saveSettingsBtn.disabled = false;
+            console.error("Failed to save settings:", err);
+            alert("Failed to save settings.");
         });
     };
 });
