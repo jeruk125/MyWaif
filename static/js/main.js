@@ -224,6 +224,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    const ttsTypeSelect = document.getElementById('tts-type');
+    const ttsVoicevoxGroup = document.getElementById('tts-voicevox-group');
+    const ttsOpenaiGroup = document.getElementById('tts-openai-group');
+
+    function updateTTSProviderUI() {
+        if (!ttsTypeSelect) return;
+        if (ttsTypeSelect.value === 'voicevox') {
+            ttsVoicevoxGroup.style.display = 'block';
+            ttsOpenaiGroup.style.display = 'none';
+        } else {
+            ttsVoicevoxGroup.style.display = 'none';
+            ttsOpenaiGroup.style.display = 'block';
+        }
+    }
+
+    if (ttsTypeSelect) {
+        ttsTypeSelect.addEventListener('change', updateTTSProviderUI);
+    }
+
     function loadSettings() {
         fetch('/api/config')
             .then(res => res.json())
@@ -232,7 +251,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateVoiceToggleUI(isVoiceOn);
                 updateDebugToggleUI(config.debug_mode);
                 document.getElementById('set-character').value = config.active_character;
-                document.getElementById('set-voicevox').value = config.voicevox_url;
                 document.getElementById('set-mem-mode').value = config.memory_extraction_mode;
                 document.getElementById('set-mem-interval').value = config.memory_extraction_interval_turns;
 
@@ -247,6 +265,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             document.getElementById(`${type.substring(0,4)}-key`).value = p.api_key || '';
                         }
                     });
+
+                    // TTS Provider
+                    const tts = config.providers.tts || { type: 'voicevox', voicevox_url: config.voicevox_url || '' };
+                    if (document.getElementById('tts-type')) {
+                        document.getElementById('tts-type').value = tts.type || 'voicevox';
+                        document.getElementById('tts-voicevox-url').value = tts.voicevox_url || config.voicevox_url || '';
+                        document.getElementById('tts-url').value = tts.base_url || '';
+                        document.getElementById('tts-model').value = tts.model_name || '';
+                        document.getElementById('tts-key').value = tts.api_key || '';
+                        document.getElementById('tts-voice').value = tts.voice || '';
+                        updateTTSProviderUI();
+                    }
                 }
             });
     }
@@ -359,7 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
     saveSettingsBtn.onclick = () => {
         const newConfig = {
             active_character: document.getElementById('set-character').value,
-            voicevox_url: document.getElementById('set-voicevox').value,
             memory_extraction_mode: document.getElementById('set-mem-mode').value,
             memory_extraction_interval_turns: parseInt(document.getElementById('set-mem-interval').value),
             providers: {
@@ -380,9 +409,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     base_url: document.getElementById('mem-url').value,
                     model_name: document.getElementById('mem-model').value,
                     api_key: document.getElementById('mem-key').value
+                },
+                tts: {
+                    type: document.getElementById('tts-type').value,
+                    voicevox_url: document.getElementById('tts-voicevox-url').value,
+                    base_url: document.getElementById('tts-url').value,
+                    model_name: document.getElementById('tts-model').value,
+                    api_key: document.getElementById('tts-key').value,
+                    voice: document.getElementById('tts-voice').value
                 }
             }
         };
+
+        // For backward compatibility, also keep voicevox_url at the root
+        if (newConfig.providers.tts.type === 'voicevox') {
+            newConfig.voicevox_url = newConfig.providers.tts.voicevox_url;
+        }
 
         fetch('/api/config', {
             method: 'POST',

@@ -10,6 +10,7 @@ from character_loader import CharacterLoader
 from memory_manager import MemoryManager
 from llm_client import LLMClient
 from voicevox_client import VoicevoxClient
+from openai_tts_client import OpenAICompatibleTTSClient
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
@@ -20,7 +21,7 @@ config = {}
 character_data = {}
 memory_manager = None
 llm_client = None
-voicevox_client = None
+tts_client = None
 current_session_id = None
 conversation_history = []
 turn_counter = 0
@@ -30,12 +31,38 @@ def load_config():
     with open('config.json', 'r') as f:
         config = json.load(f)
 
+    # Handle backward compatibility for voicevox_url
+    if "tts" not in config.get("providers", {}):
+        if "providers" not in config:
+            config["providers"] = {}
+        config["providers"]["tts"] = {
+            "type": "voicevox",
+            "voicevox_url": config.get("voicevox_url", "http://localhost:50021")
+        }
+
 def save_config():
     with open('config.json', 'w') as f:
         json.dump(config, f, indent=4)
 
+def get_tts_client(config):
+    tts_config = config.get("providers", {}).get("tts", {})
+    provider_type = tts_config.get("type", "voicevox")
+
+    if provider_type == "voicevox":
+        voicevox_url = tts_config.get("voicevox_url") or config.get("voicevox_url", "http://localhost:50021")
+        return VoicevoxClient(voicevox_url)
+    elif provider_type in ["dashscope", "openai_compatible"]:
+        base_url = tts_config.get("base_url")
+        api_key = tts_config.get("api_key")
+        model_name = tts_config.get("model_name")
+        voice = tts_config.get("voice")
+        return OpenAICompatibleTTSClient(base_url, api_key, model_name, voice)
+    else:
+        # Fallback to voicevox
+        return VoicevoxClient(config.get("voicevox_url", "http://localhost:50021"))
+
 def initialize_system(session_id=None):
-    global character_data, memory_manager, llm_client, voicevox_client, current_session_id, conversation_history, turn_counter
+    global character_data, memory_manager, llm_client, tts_client, current_session_id, conversation_history, turn_counter
 
     load_config()
 
@@ -45,7 +72,7 @@ def initialize_system(session_id=None):
     memory_manager = MemoryManager(character_data['path'], config['embedding_model'])
 
     llm_client = LLMClient(config['providers'])
-    voicevox_client = VoicevoxClient(config['voicevox_url'])
+    tts_client = get_tts_client(config)
 
     # Session handling
     turn_counter = 0
@@ -263,13 +290,8 @@ def handle_message(data):
             dialogue_text = llm_client.extract_dialogue(response_text)
 
             if dialogue_text:
-                # Get speaker ID from character data, default to 2
-                # Here we just parse it simply, assuming it's in character.txt or use default
-                speaker_id = 2
-                import re
-                m = re.search(r'Speaker ID VoiceVox:\s*(\d+)', character_data['persona'])
-                if m:
-                    speaker_id = int(m.group(1))
+                speaker_id = character_data.get('speaker_id', 2)
+                voice_openai = character_data.get('voice_openai')
 
                 start_time_translate = time.time()
                 if is_debug: debug_info['translate_provider'] = config.get('providers', {}).get('translation', {}).get('type', 'unknown')
@@ -284,7 +306,7 @@ def handle_message(data):
 
                 if jp_text:
                     start_time_voice = time.time()
-                    audio_filename = voicevox_client.synthesize(jp_text, speaker_id=speaker_id)
+                    audio_filename = tts_client.synthesize(jp_text, speaker_id=speaker_id, voice=voice_openai)
                     voice_latency = time.time() - start_time_voice
 
                     if is_debug:
@@ -296,7 +318,7 @@ def handle_message(data):
                         emit('audio_ready', {'audio_url': f'/audio/{audio_filename}'})
 
             # Cleanup old cache
-            voicevox_client.cleanup_cache()
+            tts_client.cleanup_cache()
         else:
             if is_debug:
                 debug_info['translate_status'] = "Skipped"
