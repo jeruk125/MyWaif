@@ -32,9 +32,24 @@ Aplikasi roleplay chat berbasis AI dengan long-term memory, sistem relationship,
 - Pergi ke tab **Local Server**, pastikan berjalan di port `1234`.
 - Aktifkan fitur **CORS** (Cross-Origin Resource Sharing) di LM Studio jika diperlukan.
 
-### 2. Setup VoiceVox
+### 2. Setup TTS (VoiceVox atau Alternatif Lainnya)
+
+Aplikasi ini mendukung beberapa provider Text-to-Speech (TTS):
+
+**A. VoiceVox (Default, Offline)**
 - Buka aplikasi VoiceVox.
 - Biarkan berjalan di latar belakang (default port adalah `50021`).
+- Pada UI Settings web app, pilih TTS Provider: "VoiceVox".
+
+**B. Qwen-Bailian / DashScope (Online)**
+- Dapatkan API key dari [Alibaba Cloud Model Studio / DashScope](https://dashscope.aliyun.com/).
+- Pada UI Settings web app, pilih TTS Provider: "Qwen-Bailian (DashScope)".
+- Masukkan API Key Anda, isi model (contoh: `sambert-zhimiao-emo-v1`), dan isi voice (contoh: `zhimiao_emo`).
+
+**C. OpenAI-Compatible TTS (Online/Local)**
+- Gunakan endpoint OpenAI-compatible seperti MiMo atau server TTS lokal.
+- Pada UI Settings web app, pilih TTS Provider: "OpenAI Compatible".
+- Masukkan Base URL, API Key, Model Name, dan Voice Name sesuai dengan provider Anda.
 
 ## Cara Menjalankan
 

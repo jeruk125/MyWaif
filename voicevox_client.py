@@ -10,7 +10,7 @@ class VoicevoxClient:
         if not os.path.exists(self.audio_cache_dir):
             os.makedirs(self.audio_cache_dir)
 
-    def synthesize(self, text, speaker_id=2):
+    def synthesize(self, text, speaker_id=2, voice=None):
         """Generates audio from text using VoiceVox and saves it to a file."""
         if not text:
             return None
@@ -56,7 +56,11 @@ class VoicevoxClient:
     def cleanup_cache(self, keep_latest=50):
         """Removes old audio files to prevent unlimited disk usage."""
         try:
-            files = [os.path.join(self.audio_cache_dir, f) for f in os.listdir(self.audio_cache_dir) if f.endswith('.wav')]
+            files = [
+                os.path.join(self.audio_cache_dir, f)
+                for f in os.listdir(self.audio_cache_dir)
+                if f.endswith('.wav') or f.endswith('.mp3')
+            ]
             files.sort(key=os.path.getctime)
 
             # Keep the latest files, delete the rest

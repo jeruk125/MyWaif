@@ -72,7 +72,6 @@
             <div class="settings-group">
                 <h3>General</h3>
                 <label>Active Character: <input type="text" id="set-character"></label>
-                <label>VoiceVox URL: <input type="text" id="set-voicevox"></label>
                 <label>Memory Extraction Mode:
                     <select id="set-mem-mode">
                         <option value="background">Background</option>
@@ -125,6 +124,26 @@
                     <label>Base URL: <input type="text" id="mem-url"></label>
                     <label>Model Name: <input type="text" id="mem-model"></label>
                     <label>API Key: <input type="password" id="mem-key"></label>
+                </div>
+
+                <div class="provider-section">
+                    <h4>TTS Provider</h4>
+                    <label>Type:
+                        <select id="tts-type">
+                            <option value="voicevox">VoiceVox</option>
+                            <option value="dashscope">Qwen-Bailian (DashScope)</option>
+                            <option value="openai_compatible">OpenAI Compatible (MiMo, dll)</option>
+                        </select>
+                    </label>
+                    <div id="tts-voicevox-group">
+                        <label>VoiceVox URL: <input type="text" id="tts-voicevox-url"></label>
+                    </div>
+                    <div id="tts-openai-group">
+                        <label>Base URL: <input type="text" id="tts-url"></label>
+                        <label>Model Name: <input type="text" id="tts-model"></label>
+                        <label>API Key: <input type="password" id="tts-key"></label>
+                        <label>Voice Name: <input type="text" id="tts-voice"></label>
+                    </div>
                 </div>
             </div>
 

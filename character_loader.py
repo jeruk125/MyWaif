@@ -24,9 +24,23 @@ class CharacterLoader:
             with open(lore_txt_path, "r", encoding="utf-8") as f:
                 lore = f.read()
 
+        # Parse speaker_id and voice_openai
+        import re
+        speaker_id = 2 # Default VoiceVox speaker
+        m_speaker = re.search(r'Speaker ID VoiceVox:\s*(\d+)', persona, re.IGNORECASE)
+        if m_speaker:
+            speaker_id = int(m_speaker.group(1))
+
+        voice_openai = None
+        m_voice = re.search(r'voice_openai:\s*(.+)', persona, re.IGNORECASE)
+        if m_voice:
+            voice_openai = m_voice.group(1).strip()
+
         return {
             "id": character_id,
             "persona": persona,
             "lore": lore,
-            "path": char_path
+            "path": char_path,
+            "speaker_id": speaker_id,
+            "voice_openai": voice_openai
         }
